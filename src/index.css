@@ -1,13 +1,61 @@
 body {
+  font-family: 'Poppins', 'Roboto', 'Inter', 'Arial', sans-serif;
+  background: #18181b;
   margin: 0;
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
-    'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue',
-    sans-serif;
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
+  padding: 0;
+  color: white;
+  min-height: 100vh;
 }
 
-code {
-  font-family: source-code-pro, Menlo, Monaco, Consolas, 'Courier New',
-    monospace;
+.app {
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+}
+
+.matte-card {
+  background: linear-gradient(135deg, #222326 80%, #33343b 100%);
+  box-shadow: 0 4px 32px 0 rgba(24, 24, 27, 0.25);
+  border: 1px solid #3f3f46;
+}
+
+.yellow-glow {
+  box-shadow: 0 4px 24px 0 rgba(255, 230, 0, 0.333);
+}
+
+.anim-fade {
+  animation: fadeIn 1s ease;
+}
+
+.hero-anim {
+  animation: fadeInUp 1.5s cubic-bezier(0.6, 0.05, 0.1, 0.95);
+}
+
+.form-anim {
+  animation: fadeIn 1.2s cubic-bezier(0.6, 0.05, 0.1, 0.95);
+}
+
+.anim-pop {
+  animation: popIn 0.7s cubic-bezier(0.5, 1.3, 0.6, 1) both;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes fadeInUp {
+  from {
+    opacity: 0;
+    transform: translateY(32px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes popIn {
+  0% { transform: scale(0.8); opacity: 0; }
+  100% { transform: scale(1); opacity: 1; }
 }
