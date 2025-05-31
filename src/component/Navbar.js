@@ -1,5 +1,7 @@
 import React, { useState } from 'react';
-import { FaPhone, FaBars, FaTimes } from 'react-icons/fa';
+import { FaBars, FaTimes } from 'react-icons/fa';
+import { FaPhone } from "react-icons/fa6";
+
 
 const Navbar = () => {
   const [isOpen, setIsOpen] = useState(false);
