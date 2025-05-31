@@ -11,24 +11,27 @@ const Contact = () => {
         <div className="text-neutral-200 text-lg mb-4">
           Have questions or need help? Reach out to our friendly team anytime.
         </div>
+        
         <div className="mb-2">
           <span className="font-bold text-yellow-400">Phone:</span>
           <a href="tel:+61412345678" className="ml-2 hover:underline text-neutral-100">
             +61 412 345 678
           </a>
         </div>
-        <div className="mb-2">
+        
+        <div className="mb-2 flex flex-col sm:flex-row">
           <span className="font-bold text-yellow-400">Email:</span>
           <a
             href="mailto:bookings@platinumtaxi.com.au"
-            className="ml-2 hover:underline text-neutral-100"
+            className="sm:ml-2 hover:underline text-neutral-100 break-all"
           >
             bookings@platinumtaxi.com.au
           </a>
         </div>
-        <div>
+        
+        <div className="flex flex-col sm:flex-row">
           <span className="font-bold text-yellow-400">Address:</span>
-          <span className="ml-2 text-neutral-100">Sydney, NSW, Australia</span>
+          <span className="sm:ml-2 text-neutral-100">Sydney, NSW, Australia</span>
         </div>
       </div>
     </section>
