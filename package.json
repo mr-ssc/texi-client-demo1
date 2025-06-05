@@ -3,6 +3,8 @@
   "version": "0.1.0",
   "private": true,
   "dependencies": {
+    "@firebase/analytics": "^0.10.0",
+    "@firebase/firestore": "^3.11.0",
     "@fortawesome/fontawesome-svg-core": "^6.7.2",
     "@fortawesome/free-solid-svg-icons": "^6.7.2",
     "@fortawesome/react-fontawesome": "^0.2.2",
@@ -12,7 +14,7 @@
     "@testing-library/react": "^16.3.0",
     "@testing-library/user-event": "^13.5.0",
     "bootstrap": "^5.3.6",
-    "firebase": "^11.8.1",
+    "firebase": "^9.22.0",
     "fortawesome": "^0.0.1-security",
     "react": "^19.1.0",
     "react-bootstrap": "^2.10.10",
@@ -51,5 +53,8 @@
     "autoprefixer": "^10.4.21",
     "postcss": "^8.5.4",
     "tailwindcss": "^4.1.8"
+  },
+  "resolutions": {
+    "source-map-loader": "none"
   }
 }
