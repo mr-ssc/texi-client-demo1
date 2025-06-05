@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { initializeApp } from "firebase/app";
 import { getFirestore, collection, getDocs, doc, getDoc, addDoc, setDoc, Timestamp, serverTimestamp, increment } from "firebase/firestore";
 // import { getAnalytics } from "firebase/analytics";
@@ -27,10 +27,13 @@ const BookingForm = () => {
   const [error, setError] = useState(null);
   const [showConfirmModal, setShowConfirmModal] = useState(false);
   const [showSuccessModal, setShowSuccessModal] = useState(false);
+  const [isBooking, setIsBooking] = useState(false);
   const [totalFare, setTotalFare] = useState(null);
+  const [distance, setDistance] = useState(null);
+  const [distanceFailed, setDistanceFailed] = useState(false);
   const [formData, setFormData] = useState({
-    pickupAddress: '123 Main St, Mumbai, India',
-    dropAddress: '456 Park Ave, Mumbai, India',
+    pickupAddress: '',
+    dropAddress: '',
     serviceTypeId: '',
     taxiTypeId: '',
     tripTypeId: '',
@@ -46,6 +49,11 @@ const BookingForm = () => {
     tripStatus: 'Pending',
   });
 
+  const pickupRef = useRef(null);
+  const dropRef = useRef(null);
+  const [pickupCoords, setPickupCoords] = useState(null);
+  const [dropCoords, setDropCoords] = useState(null);
+
   const companyId = 'abc_pvt_ltd';
   const basePath = `Easy2Solutions/companyDirectory/tenantCompanies/${companyId}`;
   const taxiTypesPath = `${basePath}/settings/taxiBookingSettings/taxiTypes`;
@@ -55,8 +63,83 @@ const BookingForm = () => {
   const bookingsPath = `${basePath}/taxiBookings`;
   const visitorCounterPath = `${basePath}/analytics/visitorCounters/daily`;
 
+  // Initialize Google Places Autocomplete (if available)
   useEffect(() => {
-    console.log('Firestore instance:', firestore); // Debug log
+    if (window.google && window.google.maps) {
+      const pickupAutocomplete = new window.google.maps.places.Autocomplete(pickupRef.current, {
+        types: ['address'],
+        componentRestrictions: { country: 'in' }, // Restrict to India
+      });
+      const dropAutocomplete = new window.google.maps.places.Autocomplete(dropRef.current, {
+        types: ['address'],
+        componentRestrictions: { country: 'in' },
+      });
+
+      pickupAutocomplete.addListener('place_changed', () => {
+        const place = pickupAutocomplete.getPlace();
+        if (place.formatted_address) {
+          setFormData(prev => ({ ...prev, pickupAddress: place.formatted_address }));
+          setPickupCoords({
+            lat: place.geometry.location.lat(),
+            lng: place.geometry.location.lng(),
+          });
+        }
+      });
+
+      dropAutocomplete.addListener('place_changed', () => {
+        const place = dropAutocomplete.getPlace();
+        if (place.formatted_address) {
+          setFormData(prev => ({ ...prev, dropAddress: place.formatted_address }));
+          setDropCoords({
+            lat: place.geometry.location.lat(),
+            lng: place.geometry.location.lng(),
+          });
+        }
+      });
+    } else {
+      console.warn('Google Maps API not loaded; manual address input enabled.');
+    }
+  }, []);
+
+  // Calculate distance when both coordinates are available
+  useEffect(() => {
+    if (pickupCoords && dropCoords && window.google && window.google.maps) {
+      const distanceService = new window.google.maps.DistanceMatrixService();
+      distanceService.getDistanceMatrix(
+        {
+          origins: [pickupCoords],
+          destinations: [dropCoords],
+          travelMode: 'DRIVING',
+          unitSystem: window.google.maps.UnitSystem.METRIC,
+        },
+        (response, status) => {
+          if (status === 'OK' && response.rows[0].elements[0].status === 'OK') {
+            const distanceKm = response.rows[0].elements[0].distance.value / 1000; // Convert meters to km
+            setDistance(distanceKm);
+            setDistanceFailed(false);
+            if (settings && settings.perKmFare) {
+              const fare = distanceKm * settings.perKmFare;
+              setTotalFare(fare);
+            }
+          } else {
+            console.error('Distance Matrix Error:', status, response);
+            setDistanceFailed(true);
+            if (settings) {
+              setTotalFare(settings.minimumFare || 50.0);
+            }
+          }
+        }
+      );
+    } else if (settings && (formData.pickupAddress && formData.dropAddress)) {
+      // Fallback to minimum fare if coordinates are unavailable but addresses are entered
+      setDistanceFailed(true);
+      setTotalFare(settings.minimumFare || 50.0);
+    }
+  }, [pickupCoords, dropCoords, settings, formData.pickupAddress, formData.dropAddress]);
+
+  // Fetch Firestore data
+  useEffect(() => {
+    console.log('Firestore instance:', firestore);
     const fetchData = async () => {
       try {
         setLoading(true);
@@ -95,7 +178,10 @@ const BookingForm = () => {
           const settingsData = settingsDoc.data();
           console.log('Settings:', settingsData);
           setSettings(settingsData);
-          setTotalFare(settingsData.minimumFare || 50.0);
+          // Set initial fare only if distance is not yet calculated
+          if (!distance) {
+            setTotalFare(settingsData.minimumFare || 50.0);
+          }
         } else {
           throw new Error('Settings document not found');
         }
@@ -126,14 +212,18 @@ const BookingForm = () => {
       return;
     }
 
-    const fare = totalFare || 50.0;
-    setTotalFare(fare);
+    if (!totalFare) {
+      alert('Unable to calculate fare; please try again or contact support');
+      return;
+    }
+
     setFormData(data);
     setShowConfirmModal(true);
   };
 
   const confirmBooking = async () => {
     try {
+      setIsBooking(true);
       const bookingData = {
         passengerNumbers: parseInt(formData.passengerNumber, 10),
         firstName: formData.firstName,
@@ -155,6 +245,7 @@ const BookingForm = () => {
         lastUpdatedBy: 'customer',
         createdAt: serverTimestamp(),
         lastUpdatedAt: serverTimestamp(),
+        distanceCalculated: !distanceFailed, // Store whether distance was calculated
       };
 
       await addDoc(collection(firestore, bookingsPath), bookingData);
@@ -181,6 +272,8 @@ const BookingForm = () => {
       console.error('Booking Error:', err);
       alert('Error creating booking: ' + err.message);
       setShowConfirmModal(false);
+    } finally {
+      setIsBooking(false);
     }
   };
 
@@ -232,6 +325,7 @@ const BookingForm = () => {
           <input
             type="text"
             name="pickupAddress"
+            ref={pickupRef}
             className="w-full rounded-lg px-4 py-3 bg-neutral-800 text-white border-none outline-none focus:ring-2 focus:ring-yellow-400 transition"
             value={formData.pickupAddress}
             onChange={handleInputChange}
@@ -245,6 +339,7 @@ const BookingForm = () => {
           <input
             type="text"
             name="dropAddress"
+            ref={dropRef}
             className="w-full rounded-lg px-4 py-3 bg-neutral-800 text-white border-none outline-none focus:ring-2 focus:ring-yellow-400 transition"
             value={formData.dropAddress}
             onChange={handleInputChange}
@@ -311,7 +406,7 @@ const BookingForm = () => {
             <input
               type="text"
               name="lastName"
-              className="w-full rounded-lg px-4 py-3 bg-neutral-800 text-white border-none outline-none focus:ring-2 focus:ring-yellow-400 transition"
+              className="w-full rounded-lg px4-py-4 py-3 bg-neutral-800 text-white border-none outline-none focus:ring-2 focus:ring-yellow-400 transition"
               value={formData.lastName}
               onChange={handleInputChange}
               placeholder="Last name"
@@ -419,9 +514,16 @@ const BookingForm = () => {
         <div className="fixed inset-0 bg-black bg-opacity-50 flex justify-center items-center z-50">
           <div className="bg-[#18181b] rounded-3xl p-6 max-w-md w-full border border-[#27272a]">
             <h3 className="text-2xl font-bold text-[#facc15] mb-4">Confirm Booking</h3>
-            <p className="text-[#e4e4e7] mb-6">
-              Total fare for this trip is ₹{totalFare ? totalFare.toFixed(2) : 0}. Are you sure you want to book this ride?
+            <p className="text-[#e4e4e7] mb-2">
+              Total fare for this trip is ₹{totalFare ? totalFare.toFixed(2) : 0}
+              {distance ? ` for ${distance.toFixed(2)} km` : ''}.
             </p>
+            {distanceFailed && (
+              <p className="text-[#e4e4e7] text-sm mb-4">
+                Note: Fare rate will be updated based on distance traveled and finalized after discussion with the driver.
+              </p>
+            )}
+            <p className="text-[#e4e4e7] mb-6">Are you sure you want to book this ride?</p>
             <div className="flex justify-end gap-4">
               <button
                 className="bg-[#27272a] text-[#e4e4e7] px-4 py-2 rounded-full hover:bg-[#3f3f46] transition"
@@ -436,6 +538,16 @@ const BookingForm = () => {
                 Confirm
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Wait Dialog */}
+      {isBooking && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex justify-center items-center z-50">
+          <div className="bg-[#18181b] rounded-3xl p-8 max-w-sm w-full border border-[#27272a] flex flex-col items-center">
+            <div className="w-8 h-8 border-4 border-t-yellow-400 border-gray-600 rounded-full animate-spin mb-4"></div>
+            <p className="text-[#e4e4e7] text-lg font-semibold">Wait...</p>
           </div>
         </div>
       )}
