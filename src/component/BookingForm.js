@@ -1,22 +1,9 @@
 import React, { useState, useEffect } from 'react';
-import { initializeApp } from "firebase/app";
-import { getFirestore, collection, getDocs, doc, getDoc, addDoc, setDoc, Timestamp, serverTimestamp, increment } from "firebase/firestore";
-import { getAnalytics } from "firebase/analytics";
-
-// Firebase configuration and initialization
-const firebaseConfig = {
-  apiKey: "AIzaSyAY3TseN8w0IvVJIxpaYvLKnP3H1DmtFYg",
-  authDomain: "requiementgathering.firebaseapp.com",
-  projectId: "requiementgathering",
-  storageBucket: "requiementgathering.firebasestorage.app",
-  messagingSenderId: "297040139948",
-  appId: "1:297040139948:web:4a339a1d3150e95a3c3109",
-  measurementId: "G-TB2KW7KLLB"
-};
-
-const app = initializeApp(firebaseConfig);
-const analytics = getAnalytics(app);
-const firestore = getFirestore(app);
+import firebase from 'firebase/app';
+import { Firestore } from 'firebase/firestore'
+import { Modal, Button } from 'react-bootstrap';
+import 'bootstrap/dist/css/bootstrap.min.css';
+import './BookingForm.css'; // Your CSS
 
 const BookingForm = () => {
   const [taxiTypes, setTaxiTypes] = useState([]);
@@ -29,8 +16,8 @@ const BookingForm = () => {
   const [showSuccessModal, setShowSuccessModal] = useState(false);
   const [totalFare, setTotalFare] = useState(null);
   const [formData, setFormData] = useState({
-    pickupAddress: '123 Main St, Mumbai, India',
-    dropAddress: '456 Park Ave, Mumbai, India',
+    pickupAddress: '123 Main St, City, Country',
+    dropAddress: '456 Park Ave, City, Country',
     serviceTypeId: '',
     taxiTypeId: '',
     tripTypeId: '',
@@ -41,12 +28,17 @@ const BookingForm = () => {
     countryCode: '+91',
     mobileNumber: '9876543210',
     additionalInfo: 'Please arrive on time.',
-    tripDate: new Date().toISOString().split('T')[0],
+    tripDate: new Date().toISOString().split('T')[0], // Today's date
     tripStartTime: '10:00',
-    tripStatus: 'Pending',
   });
 
+
+
+
+  // Static company ID
   const companyId = 'abc_pvt_ltd';
+
+  // Firestore paths - fixed template literals
   const basePath = `Easy2Solutions/companyDirectory/tenantCompanies/${companyId}`;
   const taxiTypesPath = `${basePath}/settings/taxiBookingSettings/taxiTypes`;
   const tripTypesPath = `${basePath}/settings/taxiBookingSettings/tripTypes`;
@@ -55,52 +47,41 @@ const BookingForm = () => {
   const bookingsPath = `${basePath}/taxiBookings`;
   const visitorCounterPath = `${basePath}/analytics/visitorCounters/daily`;
 
+  // Fetch Firestore data
   useEffect(() => {
-    console.log('Firestore instance:', firestore); // Debug log
     const fetchData = async () => {
       try {
         setLoading(true);
-        console.log('Fetching data from Firestore...');
-
-        // Fetch Taxi Types
-        const taxiTypesSnapshot = await getDocs(collection(firestore, taxiTypesPath));
+        const taxiTypesSnapshot = await firebase.firestore().collection(taxiTypesPath).get();
         const taxiTypesData = taxiTypesSnapshot.docs.map(doc => ({
           id: doc.id,
           name: doc.data().name,
         }));
-        console.log('Taxi Types:', taxiTypesData);
         setTaxiTypes(taxiTypesData);
 
-        // Fetch Trip Types
-        const tripTypesSnapshot = await getDocs(collection(firestore, tripTypesPath));
+        const tripTypesSnapshot = await firebase.firestore().collection(tripTypesPath).get();
         const tripTypesData = tripTypesSnapshot.docs.map(doc => ({
           id: doc.id,
           name: doc.data().name,
         }));
-        console.log('Trip Types:', tripTypesData);
         setTripTypes(tripTypesData);
 
-        // Fetch Service Types
-        const serviceTypesSnapshot = await getDocs(collection(firestore, serviceTypesPath));
+        const serviceTypesSnapshot = await firebase.firestore().collection(serviceTypesPath).get();
         const serviceTypesData = serviceTypesSnapshot.docs.map(doc => ({
           id: doc.id,
           name: doc.data().name,
         }));
-        console.log('Service Types:', serviceTypesData);
         setServiceTypes(serviceTypesData);
 
-        // Fetch Settings
-        const settingsDoc = await getDoc(doc(firestore, settingsPath));
-        if (settingsDoc.exists()) {
-          const settingsData = settingsDoc.data();
-          console.log('Settings:', settingsData);
-          setSettings(settingsData);
-          setTotalFare(settingsData.minimumFare || 50.0);
+        const settingsDoc = await firebase.firestore().doc(settingsPath).get();
+        if (settingsDoc.exists) {
+          setSettings(settingsDoc.data());
+          // Set default fare from settings or use static value
+          setTotalFare(settingsDoc.data().minimumFare || 50.0);
         } else {
           throw new Error('Settings document not found');
         }
       } catch (err) {
-        console.error('Firestore Error:', err);
         setError('Failed to load data: ' + err.message);
       } finally {
         setLoading(false);
@@ -110,28 +91,36 @@ const BookingForm = () => {
     fetchData();
   }, []);
 
+
+
+
+
+  // Handle form input changes
   const handleInputChange = (e) => {
     const { name, value } = e.target;
     setFormData(prev => ({ ...prev, [name]: value }));
   };
 
+  // Handle form submission
   const handleSubmit = async (e) => {
     e.preventDefault();
     const data = formData;
 
     if (!data.pickupAddress || !data.dropAddress || !data.serviceTypeId || !data.taxiTypeId || !data.tripTypeId ||
-        !data.passengerNumber || !data.firstName || !data.lastName || !data.email || !data.countryCode || !data.mobileNumber ||
-        !data.tripDate || !data.tripStartTime) {
+      !data.passengerNumber || !data.firstName || !data.lastName || !data.email || !data.countryCode || !data.mobileNumber ||
+      !data.tripDate || !data.tripStartTime) {
       alert('Please fill all required fields');
       return;
     }
 
+    // Use static fare (from settings or hardcoded)
     const fare = totalFare || 50.0;
     setTotalFare(fare);
     setFormData(data);
     setShowConfirmModal(true);
   };
 
+  // Handle booking confirmation
   const confirmBooking = async () => {
     try {
       const bookingData = {
@@ -147,25 +136,24 @@ const BookingForm = () => {
         additionalInfo: formData.additionalInfo || '',
         pickupAddress: formData.pickupAddress,
         dropAddress: formData.dropAddress,
-        tripDate: Timestamp.fromDate(new Date(formData.tripDate)),
+        tripDate: firebase.firestore.Timestamp.fromDate(new Date(formData.tripDate)),
         tripStartTime: formData.tripStartTime,
-        tripStatus: 'Pending',
+        tripStatus: 'pending',
         accepted: false,
         totalFareAmount: totalFare,
         lastUpdatedBy: 'customer',
-        createdAt: serverTimestamp(),
-        lastUpdatedAt: serverTimestamp(),
+        createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+        lastUpdatedAt: firebase.firestore.FieldValue.serverTimestamp(),
       };
 
-      await addDoc(collection(firestore, bookingsPath), bookingData);
+      await firebase.firestore().collection(bookingsPath).add(bookingData);
 
       const currentDate = new Date().toISOString().split('T')[0];
-      const counterRef = doc(firestore, visitorCounterPath, currentDate);
-      await setDoc(
-        counterRef,
+      const counterRef = firebase.firestore().collection(visitorCounterPath).doc(currentDate);
+      await counterRef.set(
         {
-          count: increment(1),
-          lastUpdated: serverTimestamp(),
+          count: firebase.firestore.FieldValue.increment(1),
+          lastUpdated: firebase.firestore.FieldValue.serverTimestamp(),
           page: 'TaxiBookingPage',
         },
         { merge: true }
@@ -178,44 +166,37 @@ const BookingForm = () => {
       setShowConfirmModal(false);
       setShowSuccessModal(true);
     } catch (err) {
-      console.error('Booking Error:', err);
       alert('Error creating booking: ' + err.message);
       setShowConfirmModal(false);
     }
   };
 
+  // WhatsApp notification placeholder
   const sendWhatsAppNotification = (firstName, lastName, fare) => {
     const mobileNumber = '9426604346';
     const message = `New booking by ${firstName} ${lastName}. Total fare: ${fare.toFixed(2)} INR.`;
     console.log(`Sending WhatsApp to ${mobileNumber}: ${message}`);
-    // Implement WhatsApp API call here
+    // Add actual WhatsApp API call here
   };
 
   if (loading) {
-    return (
-      <div className="fixed inset-0 bg-black bg-opacity-50 flex justify-center items-center z-50">
-        <div className="bg-[#18181b] rounded-3xl p-8 max-w-sm w-full border border-[#27272a] flex flex-col items-center">
-          <div className="w-8 h-8 border-4 border-t-yellow-400 border-gray-600 rounded-full animate-spin mb-4"></div>
-          <p className="text-[#e4e4e7] text-lg font-semibold">Loading...</p>
-        </div>
-      </div>
-    );
+    return <div>Loading...</div>;
   }
 
   if (error) {
-    return <div className="text-red-500 text-center">{error}</div>;
+    return <div>{error}</div>;
   }
 
   return (
-    <section id="booking" className="flex justify-center items-center py-16 px-4 bg-neutral-900 bg-gradient-to-b from-black/80 via-neutral-900/90 to-neutral-950/90">
-      <form onSubmit={handleSubmit} className="matte-card anim-fade p-8 md:p-12 rounded-3xl max-w-2xl w-full grid grid-cols-1 gap-6 shadow-2xl border border-neutral-800">
-        <h2 className="text-3xl font-extrabold text-yellow-400 mb-2 tracking-tight text-center">Book Your Taxi</h2>
+    <section className="booking-section">
+      <form onSubmit={handleSubmit} className="booking-form">
+        <h2 className="form-title">Book Your Taxi</h2>
 
-        <div>
-          <label className="block text-neutral-200 mb-1 font-semibold">Service Type</label>
+        <div className="form-group">
+          <label className="form-label">Service Type</label>
           <select
             name="serviceTypeId"
-            className="w-full rounded-lg px-4 py-3 bg-neutral-800 text-white border-none outline-none focus:ring-2 focus:ring-yellow-400 transition"
+            className="form-input"
             value={formData.serviceTypeId}
             onChange={handleInputChange}
             required
@@ -227,12 +208,12 @@ const BookingForm = () => {
           </select>
         </div>
 
-        <div>
-          <label className="block text-neutral-200 mb-1 font-semibold">Pickup Address</label>
+        <div className="form-group">
+          <label className="form-label">Pickup Address</label>
           <input
             type="text"
             name="pickupAddress"
-            className="w-full rounded-lg px-4 py-3 bg-neutral-800 text-white border-none outline-none focus:ring-2 focus:ring-yellow-400 transition"
+            className="form-input"
             value={formData.pickupAddress}
             onChange={handleInputChange}
             placeholder="Enter pickup address"
@@ -240,12 +221,12 @@ const BookingForm = () => {
           />
         </div>
 
-        <div>
-          <label className="block text-neutral-200 mb-1 font-semibold">Drop Address</label>
+        <div className="form-group">
+          <label className="form-label">Drop Address</label>
           <input
             type="text"
             name="dropAddress"
-            className="w-full rounded-lg px-4 py-3 bg-neutral-800 text-white border-none outline-none focus:ring-2 focus:ring-yellow-400 transition"
+            className="form-input"
             value={formData.dropAddress}
             onChange={handleInputChange}
             placeholder="Enter drop address"
@@ -253,24 +234,24 @@ const BookingForm = () => {
           />
         </div>
 
-        <div className="flex flex-col sm:flex-row gap-4">
-          <div className="flex-1">
-            <label className="block text-neutral-200 mb-1 font-semibold">Date</label>
+        <div className="form-row">
+          <div className="form-group flex-1">
+            <label className="form-label">Date</label>
             <input
               type="date"
               name="tripDate"
-              className="w-full rounded-lg px-4 py-3 bg-neutral-800 text-white border-none outline-none focus:ring-2 focus:ring-yellow-400 transition"
+              className="form-input"
               value={formData.tripDate}
               onChange={handleInputChange}
               required
             />
           </div>
-          <div className="flex-1">
-            <label className="block text-neutral-200 mb-1 font-semibold">Time</label>
+          <div className="form-group flex-1">
+            <label className="form-label">Time</label>
             <input
               type="time"
               name="tripStartTime"
-              className="w-full rounded-lg px-4 py-3 bg-neutral-800 text-white border-none outline-none focus:ring-2 focus:ring-yellow-400 transition"
+              className="form-input"
               value={formData.tripStartTime}
               onChange={handleInputChange}
               required
@@ -278,40 +259,40 @@ const BookingForm = () => {
           </div>
         </div>
 
-        <div>
-          <label className="block text-neutral-200 mb-1 font-semibold">Passenger Number</label>
+        <div className="form-group">
+          <label className="form-label">Passenger Number</label>
           <input
             type="number"
             name="passengerNumber"
             min="1"
             max="20"
-            className="w-full rounded-lg px-4 py-3 bg-neutral-800 text-white border-none outline-none focus:ring-2 focus:ring-yellow-400 transition"
+            className="form-input"
             value={formData.passengerNumber}
             onChange={handleInputChange}
-            placeholder="Number"
+            placeholder="No. of passengers"
             required
           />
         </div>
 
-        <div className="flex gap-4">
-          <div className="flex-1">
-            <label className="block text-neutral-200 mb-1 font-semibold">First Name</label>
+        <div className="form-row">
+          <div className="form-group flex-1">
+            <label className="form-label">First Name</label>
             <input
               type="text"
               name="firstName"
-              className="w-full rounded-lg px-4 py-3 bg-neutral-800 text-white border-none outline-none focus:ring-2 focus:ring-yellow-400 transition"
+              className="form-input"
               value={formData.firstName}
               onChange={handleInputChange}
               placeholder="First name"
               required
             />
           </div>
-          <div className="flex-1">
-            <label className="block text-neutral-200 mb-1 font-semibold">Last Name</label>
+          <div className="form-group flex-1">
+            <label className="form-label">Last Name</label>
             <input
               type="text"
               name="lastName"
-              className="w-full rounded-lg px-4 py-3 bg-neutral-800 text-white border-none outline-none focus:ring-2 focus:ring-yellow-400 transition"
+              className="form-input"
               value={formData.lastName}
               onChange={handleInputChange}
               placeholder="Last name"
@@ -320,12 +301,12 @@ const BookingForm = () => {
           </div>
         </div>
 
-        <div>
-          <label className="block text-neutral-200 mb-1 font-semibold">Email</label>
+        <div className="form-group">
+          <label className="form-label">Email</label>
           <input
             type="email"
             name="email"
-            className="w-full rounded-lg px-4 py-3 bg-neutral-800 text-white border-none outline-none focus:ring-2 focus:ring-yellow-400 transition"
+            className="form-input"
             value={formData.email}
             onChange={handleInputChange}
             placeholder="your@email.com"
@@ -333,12 +314,12 @@ const BookingForm = () => {
           />
         </div>
 
-        <div className="flex flex-col sm:flex-row gap-4">
-          <div className="w-full sm:w-auto sm:flex-[0.6]">
-            <label className="block text-neutral-200 mb-1 font-semibold">Country Code</label>
+        <div className="form-row">
+          <div className="form-group">
+            <label className="form-label">Country Code</label>
             <select
               name="countryCode"
-              className="w-full rounded-lg px-4 py-3 bg-neutral-800 text-white border-none outline-none focus:ring-2 focus:ring-yellow-400 transition"
+              className="form-input"
               value={formData.countryCode}
               onChange={handleInputChange}
               required
@@ -349,12 +330,12 @@ const BookingForm = () => {
               <option value="+91">+91</option>
             </select>
           </div>
-          <div className="w-full sm:flex-1">
-            <label className="block text-neutral-200 mb-1 font-semibold">Mobile No.</label>
+          <div className="form-group flex-1">
+            <label className="form-label">Mobile No.</label>
             <input
               type="tel"
               name="mobileNumber"
-              className="w-full rounded-lg px-4 py-3 bg-neutral-800 text-white border-none outline-none focus:ring-2 focus:ring-yellow-400 transition"
+              className="form-input"
               value={formData.mobileNumber}
               onChange={handleInputChange}
               placeholder="Mobile number"
@@ -363,11 +344,11 @@ const BookingForm = () => {
           </div>
         </div>
 
-        <div>
-          <label className="block text-neutral-200 mb-1 font-semibold">Taxi Type</label>
+        <div className="form-group">
+          <label className="form-label">Taxi Type</label>
           <select
             name="taxiTypeId"
-            className="w-full rounded-lg px-4 py-3 bg-neutral-800 text-white border-none outline-none focus:ring-2 focus:ring-yellow-400 transition"
+            className="form-input"
             value={formData.taxiTypeId}
             onChange={handleInputChange}
             required
@@ -379,11 +360,11 @@ const BookingForm = () => {
           </select>
         </div>
 
-        <div>
-          <label className="block text-neutral-200 mb-1 font-semibold">Trip Type</label>
+        <div className="form-group">
+          <label className="form-label">Trip Type</label>
           <select
             name="tripTypeId"
-            className="w-full rounded-lg px-4 py-3 bg-neutral-800 text-white border-none outline-none focus:ring-2 focus:ring-yellow-400 transition"
+            className="form-input"
             value={formData.tripTypeId}
             onChange={handleInputChange}
             required
@@ -395,68 +376,54 @@ const BookingForm = () => {
           </select>
         </div>
 
-        <div>
-          <label className="block text-neutral-200 mb-1 font-semibold">Additional Information</label>
+        <div className="form-group">
+          <label className="form-label">Additional Information</label>
           <textarea
             name="additionalInfo"
-            className="w-full rounded-lg px-4 py-3 bg-neutral-800 text-white border-none outline-none focus:ring-2 focus:ring-yellow-400 transition min-h-[60px]"
+            className="form-input textarea"
             value={formData.additionalInfo}
             onChange={handleInputChange}
             placeholder="Any special requests or info"
           />
         </div>
 
-        <button
-          type="submit"
-          className="bg-yellow-400 hover:bg-yellow-300 text-black font-bold text-lg px-6 py-3 rounded-full mt-2 shadow-lg transition-all duration-200 yellow-glow anim-pop"
-        >
+        <button type="submit" className="submit-button">
           Submit Booking
         </button>
       </form>
 
       {/* Confirmation Modal */}
-      {showConfirmModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex justify-center items-center z-50">
-          <div className="bg-[#18181b] rounded-3xl p-6 max-w-md w-full border border-[#27272a]">
-            <h3 className="text-2xl font-bold text-[#facc15] mb-4">Confirm Booking</h3>
-            <p className="text-[#e4e4e7] mb-6">
-              Total fare for this trip is ₹{totalFare ? totalFare.toFixed(2) : 0}. Are you sure you want to book this ride?
-            </p>
-            <div className="flex justify-end gap-4">
-              <button
-                className="bg-[#27272a] text-[#e4e4e7] px-4 py-2 rounded-full hover:bg-[#3f3f46] transition"
-                onClick={() => setShowConfirmModal(false)}
-              >
-                Cancel
-              </button>
-              <button
-                className="bg-[#facc15] text-black px-4 py-2 rounded-full hover:bg-[#eab308] transition"
-                onClick={confirmBooking}
-              >
-                Confirm
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      <Modal show={showConfirmModal} onHide={() => setShowConfirmModal(false)} dialogClassName="custom-modal">
+        <Modal.Header closeButton className="bg-[#18181b] text-[#facc15] border-[#27272a]">
+          <Modal.Title>Confirm Booking</Modal.Title>
+        </Modal.Header>
+        <Modal.Body className="bg-[#18181b] text-[#e4e4e7]">
+          Total fare for this trip is ₹{totalFare ? totalFare.toFixed(2) : 0}. Are you sure you want to book this ride?
+        </Modal.Body>
+        <Modal.Footer className="bg-[#18181b] border-[#27272a]">
+          <Button className="bg-[#27272a] text-[#e4e4e7]" onClick={() => setShowConfirmModal(false)}>
+            Cancel
+          </Button>
+          <Button className="bg-[#facc15] text-black" onClick={confirmBooking}>
+            Confirm
+          </Button>
+        </Modal.Footer>
+      </Modal>
 
       {/* Success Modal */}
-      {showSuccessModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex justify-center items-center z-50">
-          <div className="bg-[#18181b] rounded-3xl p-6 max-w-md w-full border border-[#27272a]">
-            <h3 className="text-2xl font-bold text-[#facc15] mb-4">Booking Successful</h3>
-            <p className="text-[#e4e4e7] mb-6">Your booking has been successfully registered!</p>
-            <div className="flex justify-end">
-              <button
-                className="bg-[#facc15] text-black px-4 py-2 rounded-full hover:bg-[#eab308] transition"
-                onClick={() => setShowSuccessModal(false)}
-              >
-                OK
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      <Modal show={showSuccessModal} onHide={() => setShowSuccessModal(false)} dialogClassName="custom-modal">
+        <Modal.Header closeButton className="bg-[#18181b] text-[#facc15] border-[#27272a]">
+          <Modal.Title>Booking Successful</Modal.Title>
+        </Modal.Header>
+        <Modal.Body className="bg-[#18181b] text-[#e4e4e7]">
+          Your booking has been successfully registered!
+        </Modal.Body>
+        <Modal.Footer className="bg-[#18181b] border-[#27272a]">
+          <Button className="bg-[#facc15] text-[#000000]" onClick={() => setShowSuccessModal(false)}>
+            OK
+          </Button>
+        </Modal.Footer>
+      </Modal>
     </section>
   );
 };

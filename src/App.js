@@ -8,7 +8,9 @@ import BookingForm from './component/BookingForm';
 import About from './component/About';
 import Contact from './component/Contact';
 import Footer from './component/Footer';
-import Firebaseconfig from './Firebaseconfig';
+// import firebasecConfig from '../src/firebaseConfig';
+
+
 
 
 
@@ -27,7 +29,7 @@ function App() {
         <Route path='/About' element={<About />}></Route>
         <Route path='/Contact' element={<Contact />}></Route>
         <Route path='/Footer' element={<Footer />}></Route>
-        <Route path='/Firebaseconfig' element={<Firebaseconfig />}></Route>
+        {/* <Route path='/firebaseConfig' element={<firtebaseConfig />}></Route> */}
 
 
       </Routes>
