@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { initializeApp } from "firebase/app";
 import { getFirestore, collection, getDocs, doc, getDoc, addDoc, setDoc, Timestamp, serverTimestamp, increment } from "firebase/firestore";
-// import { getAnalytics } from "firebase/analytics";
+import { getAnalytics } from "firebase/analytics";
 
 // Firebase configuration and initialization
 const firebaseConfig = {
@@ -137,6 +137,29 @@ const BookingForm = () => {
     }
   }, [pickupCoords, dropCoords, settings, formData.pickupAddress, formData.dropAddress]);
 
+  // Increment visitor counter on page load
+  useEffect(() => {
+    const updateVisitorCounter = async () => {
+      try {
+        const currentDate = new Date().toISOString().split('T')[0];
+        const counterRef = doc(firestore, visitorCounterPath, currentDate);
+        await setDoc(
+          counterRef,
+          {
+            count: increment(1),
+            lastUpdated: serverTimestamp(),
+            page: 'TaxiBookingPage',
+          },
+          { merge: true }
+        );
+      } catch (err) {
+        console.error('Visitor Counter Error:', err);
+      }
+    };
+
+    updateVisitorCounter();
+  }, []); // Empty dependency array ensures this runs once on component mount
+
   // Fetch Firestore data
   useEffect(() => {
     console.log('Firestore instance:', firestore);
@@ -250,18 +273,6 @@ const BookingForm = () => {
 
       await addDoc(collection(firestore, bookingsPath), bookingData);
 
-      const currentDate = new Date().toISOString().split('T')[0];
-      const counterRef = doc(firestore, visitorCounterPath, currentDate);
-      await setDoc(
-        counterRef,
-        {
-          count: increment(1),
-          lastUpdated: serverTimestamp(),
-          page: 'TaxiBookingPage',
-        },
-        { merge: true }
-      );
-
       if (totalFare > (settings?.whatsappNotificationFareThreshold || 0)) {
         sendWhatsAppNotification(formData.firstName, formData.lastName, totalFare);
       }
@@ -279,8 +290,8 @@ const BookingForm = () => {
 
   const sendWhatsAppNotification = (firstName, lastName, fare) => {
     const mobileNumber = '9426604346';
-    const message = `New booking by ${firstName} ${lastName}. Total fare: ${fare.toFixed(2)} INR.`;
-    console.log(`Sending WhatsApp to ${mobileNumber}: ${message}`);
+    const message = `New booking by ${firstName} ${lastName}. Total fare: ${fare.toFixed(2)} INR.;
+    console.log(Sending WhatsApp to ${mobileNumber}: ${message})`;
     // Implement WhatsApp API call here
   };
 
